@@ -1,0 +1,3 @@
+	cumulative_return	average_daily_return	std_dev_of_returns	sharpe_ratio	number_of_trades
+portfolio	0.009753	0.001090	0.042846	0.4040	6
+benchmark	-0.143106	-0.001814	0.049677	-0.5797	2
