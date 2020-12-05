@@ -1,0 +1,152 @@
+<h1 class="text-center font-italic h1 py-2">LSTM models for share trading</h1>
+<h5 class="text-center font-italic h5 py-2">Introduction</h5>
+
+<p><a href="https://en.wikipedia.org/wiki/Long_short-term_memory">Long Short Term Memory Network</a> (LSTM), a recurrent neural network, 
+has been proven to be efficient in addressing sequence-to-sequence problems such as time series forecasting. There are multiple variations 
+of LSTM ranging from simple ones like vanilla LSTM and stacked LSTM to more sophisticated models like encoder-decoder and attention-based LSTMs. 
+In this post we are going to explore and evaluate three types of LSTM models for share trading:</p>
+<ol>
+  <li>Stacked LSTM</li>
+  <li>Encoder-Decoder LSTM</li>
+  <li>Encoder-Decoder LSTM with Luong's Attention Mechanism</li>
+</ol>
+
+We will use these models to train and test three popular stocks: Apple (<a href="https://alphakickinvestments.com/companies/AAPL">AAPL</a>), Alphabet (<a href="https://alphakickinvestments.com/companies/GOOGL">GOOGL</a>) and Amazon (<a href="https://alphakickinvestments.com/companies/AMZN">AMZN</a>).
+
+
+<h5 class="text-center font-italic h5 pt-5 pb-2">Data Pre-processing</h5>
+
+<p>We use closing price data for AAPL, GOOGL and AMZN. </p>
+
+<div class="row">
+  <div class="col-12 p-2 text-center">
+    <img src="images/close_price_trend.png" class="img-fluid">
+    <p class="text-center">Closing stock price trend</p>
+  </div>
+</div>
+
+
+<p>We predict the next day's price based on the prices of the past 60 days. This is called the sliding window method. We apply the following pre-processing steps:</p>
+<ul>
+  <li>Split the data into training and testing: 2015-2019 for training and 2020 data for testing. Note that the first window in the test set does not include any data points from the training set to avoid data leakage.</li>
+  <li>Scale the data between 0 and 1 to help the models converge faster.</li>
+  <li>Get the features (past 60 days' prices) and labels (next day's price)</li>
+</ul>
+
+<script src="https://gist.github.com/ntrang086/946824670714f17a08bfbeada4d055ea.js?file=preprocessing.py"></script>
+
+<h5 class="text-center font-italic h5 pt-5 pb-2">Model 1: Stacked-LSTM</h5>
+
+<p>A Stacked-LSTM model consists of two or more LSTM layers stacking on top of each other. This allows for greater model complexity and has been proven to provide more satisfying results in sequence prediction problems over a vanilla LSTM (e.g. <a href="https://arxiv.org/abs/1303.5778">Speech Recognition With Deep Recurrent Neural Networks, 2013</a>)</p>
+
+<div class="row">
+  <div class="col-12 p-2 text-center">
+    <img src="images/stacked_lstm.png" class="img-fluid">
+    <p class="text-center"><a href="http://cs230.stanford.edu/projects_winter_2020/reports/32066186.pdf">Stacked-LSTM Architecture</a></p>
+  </div>
+</div>
+
+<p>Below is the implementation of a stacked-LSTM model to predict share prices. The argument return_sequences of the first LSTM later is set to True so that it returns the hidden state output for each input timestep (not just the last hidden state). This output of the first LSTM is the input to the second LSTM layer.</p>
+
+<script src="https://gist.github.com/ntrang086/946824670714f17a08bfbeada4d055ea.js?file=stacked_lstm.py"></script>
+
+
+<h5 class="text-center font-italic h5 pt-5 pb-2">Model 2: Encoder-Decoder LSTM</h5>
+
+<p>The Encoder-Decoder LSTM is one of the state-of-the-art models in Natural Language Processing, in particular Machine Translation(<a href="https://arxiv.org/abs/1409.3215">Sequence to Sequence Learning with Neural Networks, 2014</a>). Here we will see if we can replicate its success in predicting stock prices. In our context, the model includes a multilayered LSTM (the encoder) that maps the input sequence, i.e. 60 days of historical prices, to a fixed-length vector, and then another deep LSTM (the decoder) to decode the target sequence from the vector, i.e. predicting next day's price.</p>
+
+<div class="row">
+  <div class="col-12 p-2 text-center">
+    <img src="images/encoder_decoder.png" class="img-fluid">
+    <p class="text-center">Overall Process of an Encoder-Decoder LSTM Model</p>
+  </div>
+</div>
+
+<p>We implement the following encoder-decoder architecture to predict share prices. The encoder returns the last hidden state encoder_last_h1 and the last cell state encoder_last_h1 that are used as the initial state for the decoder. The RepeatVector layer is a "bridge" between the encoder and decoder. It adds an extra dimension to the data; in this case it ensures that the decoder gets a 3D input.</p>
+
+<script src="https://gist.github.com/ntrang086/946824670714f17a08bfbeada4d055ea.js?file=encoder-decoder.py"></script>
+
+<h5 class="text-center font-italic h5 pt-5 pb-2">Model 3: Encoder-Decoder LSTM with Luong's Attention</h5>
+
+<p>As seen in the Encoder-Decoder LSTM architecture above, only the last hidden state of the encoder is used as the context vector for the decoder. As a result, it is challenging to process long input sequences. Attention, one of a major breakthroughs in sequence prediction problem, was introduced (<a href="https://arxiv.org/abs/1409.0473">Neural Machine Translation by Jointly Learning to Align and Translate, 2015</a>) to address this problem. It creates a mapping between the encoder and decoder at each time step. At each timestep, the coder has access to the entire input sequence, but "pays attention" to relevant parts in the sequence only.</p>
+
+<div class="row">
+  <div class="col-12 p-2 text-center">
+    <img src="images/luong_attention.png" class="img-fluid">
+    <p class="text-center"><a href="https://blog.floydhub.com/attention-mechanism/">Overall Process of an Encoder-Decoder LSTM Model</a></p>
+  </div>
+</div>
+
+<p>We build a <a href="https://arxiv.org/abs/1508.04025">Luong Attention</a> model based on the above Encoder-Decoder model. Unlike above, the entire sequence of hidden states encoder_stack_h is returned instead of only the last hidden state. Along with the last cell state encoder_last_c, it's used as input into the decoder. Next the alignment store is calculated using the dot scoring function and applied a softmax activation. A context vector is then calculated and concatenated with the decoder hidden state as passed through a fully connected layer to produce a new output.</p>
+
+<script src="https://gist.github.com/ntrang086/946824670714f17a08bfbeada4d055ea.js?file=attention.py"></script>
+
+<h5 class="text-center font-italic h5 pt-5 pb-2">Training and Validation</h5>
+<p>Each of the three models is trained an validated in a similar way for each of the three stocks:</p>
+<script src="https://gist.github.com/ntrang086/946824670714f17a08bfbeada4d055ea.js?file=training.py"></script>
+<p>The below table shows the mean squared errors for three stocks for the test period by different models. The Encoder-Decoder model outperforms both Stacked and Attention models across symbols.</p>
+<table style="width:80%">
+  <tr>
+    <th>Stock</th>
+    <th>Stacked-LSTM</th>
+    <th>Encoder-Decoder</th>
+    <th>Encoder-Decoder with Attention</th>
+  </tr>
+  <tr>
+    <td>AAPL</td>
+    <td>41</td>
+    <td>24</td>
+    <td>27</td>
+  </tr>
+  <tr>
+    <td>AMZN</td>
+    <td>15,951</td>
+    <td>6,658</td>
+    <td>10,159</td>
+  </tr>
+  <tr>
+    <td>GOOGL</td>
+    <td>1,863</td>
+    <td>1,001</td>
+    <td>1,385</td>
+  </tr>
+</table>
+<p>We also build a backtest strategy using <a href="https://www.backtrader.com/docu/cerebro/">backtrader</a>. A simple TestStrategy is created to: 1) buy 1 share when the closig price is predicted to go up tomorrow; 2) sell 1 share when the price is predicted to go down and there's a downtrend over past 2 days. On the last date of the test period, we exit all positions. The predicted prices are produced by the above trained models for 2020. We compare this strategy with a BenchmarkStrategy in which we simply hold a stock from the beginning of the test period and sell it at the end of the test period. Assume that we have $10,000 in cash for trading and commission for each trade is 0.001. Below are the profits (final porfolio value - starting value).</p>
+<table style="width:80%">
+  <tr>
+    <th>Stock</th>
+    <th>Benchmark</th>
+    <th>Stacked-LSTM</th>
+    <th>Encoder-Decoder</th>
+    <th>Encoder-Decoder with Attention</th>
+  </tr>
+  <tr>
+    <td>AAPL</td>
+    <td>$54</td>
+    <td>$9</td>
+    <td>$22</td>
+    <td>$12</td>
+  </tr>
+  <tr>
+    <td>AMZN</td>
+    <td>$1,169</td>
+    <td>$615</td>
+    <td>$1,171</td>
+    <td>$1,301</td>
+  </tr>
+  <tr>
+    <td>GOOGL</td>
+    <td>$591</td>
+    <td>$528</td>
+    <td>$549</td>
+    <td>$591</td>
+  </tr>
+</table>
+<p>Although all models make money, it is quite hard to beat the benchmark strategy (buy and hold till the end). However, the Encoder-Decoder models, with and without attention, are quite promising as they make more money than the Stacked-LSTM model. The results differ across symbols: Encoder-Decoder without attention works better with AAPL while the Attention model works better with the other two stocks.</p>
+<p>This is just a starting point and the results look promising. We have future opportunities to fine-tune models, parameters (e.g., SEQ_LEN, etc.) and model hyperparameters (e.g., optimizer, learning rate, etc.) to achieve optimal results for a specific stock. We can also include additional features such as technical indicators, financial data, etc.</p>
+<h5 class="text-center font-italic h5 pt-5 pb-2">References</h5>
+<ul>
+  <li><a href="https://blog.floydhub.com/attention-mechanism/">Attention Mechanism</a></li>
+  <li><a href="https://keras.io/api/layers/recurrent_layers/lstm/">LSTM in Keras</a></li>
+  <li><a href="https://levelup.gitconnected.com/building-seq2seq-lstm-with-luong-attention-in-keras-for-time-series-forecasting-1ee00958decb">Building Seq2Seq LSTM with Luong Attention in Keras for Time Series Forecasting</a></li>
+</ul>
